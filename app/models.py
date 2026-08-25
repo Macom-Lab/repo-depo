@@ -35,3 +35,28 @@ class ScanResult(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     owner = relationship("User", back_populates="scans")
+    share_links = relationship(
+        "SharedScanLink",
+        back_populates="scan",
+        cascade="all, delete-orphan",
+    )
+
+
+class SharedScanLink(Base):
+    """A time-limited capability granting read-only access to one scan.
+
+    Only a SHA-256 digest of the high-entropy bearer token is retained. This
+    prevents a read-only database compromise from immediately exposing every
+    active shared report URL.
+    """
+
+    __tablename__ = "shared_scan_links"
+
+    id = Column(Integer, primary_key=True)
+    token_hash = Column(String(64), unique=True, index=True, nullable=False)
+    password_hash = Column(String(200), nullable=True)
+    scan_id = Column(Integer, ForeignKey("scan_results.id", ondelete="CASCADE"), nullable=False)
+    expires_at = Column(DateTime, index=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    scan = relationship("ScanResult", back_populates="share_links")

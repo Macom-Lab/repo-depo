@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vulntracker.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "vulntracker.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 3
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "vulntracker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "vulntracker.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      serviceAccountName: {{ include "vulntracker.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: api
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "vulntracker.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: ENVIRONMENT
+              value: production
+            - name: SECRET_KEY_FILE
+              value: /var/run/secrets/vulntracker/SECRET_KEY
+            - name: DATABASE_URL_FILE
+              value: /var/run/secrets/vulntracker/DATABASE_URL
+            - name: NOTIFY_SERVICE_KEY_FILE
+              value: /var/run/secrets/vulntracker/NOTIFY_SERVICE_KEY
+            - name: NOTIFY_SERVICE_URL
+              value: {{ .Values.config.notifyServiceUrl | quote }}
+            - name: ACCESS_TOKEN_EXPIRE_MINUTES
+              value: {{ .Values.config.accessTokenExpireMinutes | quote }}
+            - name: PUBLIC_BASE_URL
+              value: {{ required "config.publicBaseUrl is required" .Values.config.publicBaseUrl | quote }}
+            - name: CORS_ALLOWED_ORIGINS
+              value: {{ .Values.config.corsAllowedOrigins | quote }}
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+            - name: runtime-secrets
+              mountPath: /var/run/secrets/vulntracker
+              readOnly: true
+      volumes:
+        - name: data
+          emptyDir:
+            sizeLimit: {{ .Values.storage.dataSizeLimit }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.storage.tmpSizeLimit }}
+        - name: runtime-secrets
+          secret:
+            secretName: {{ include "vulntracker.secretName" . }}
+            defaultMode: 0440
+      terminationGracePeriodSeconds: 30
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
