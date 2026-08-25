@@ -1,0 +1,119 @@
+replicaCount: 1
+
+image:
+  repository: vulntracker-api
+  tag: "1.0.0"
+  # Replace with the digest produced by your registry after pushing the image.
+  digest: "sha256:911727695825a54e25b8554339930d8766624731ea39fbb19695fced310090aa"
+  pullPolicy: Always
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  privileged: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+
+service:
+  port: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: 1m
+  host: vulntracker.example.com
+  path: /
+  pathType: Prefix
+  tls:
+    enabled: true
+    secretName: vulntracker-tls
+
+# The External Secrets Operator and this pre-existing SecretStore or
+# ClusterSecretStore must be configured to authenticate to the cloud secrets
+# manager. Secret values never appear in this chart.
+externalSecret:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: production-secrets
+    kind: ClusterSecretStore
+  remoteRef:
+    key: vulntracker/production
+    secretKeyProperty: secret_key
+    databaseUrlProperty: database_url
+    notifyServiceKeyProperty: notify_service_key
+
+config:
+  notifyServiceUrl: http://notify:3001
+  accessTokenExpireMinutes: "30"
+  publicBaseUrl: https://vulntracker.example.com
+  corsAllowedOrigins: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+    ephemeral-storage: 50Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+    ephemeral-storage: 1Gi
+
+probes:
+  startup:
+    failureThreshold: 30
+    periodSeconds: 2
+  readiness:
+    initialDelaySeconds: 2
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  liveness:
+    initialDelaySeconds: 10
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+networkPolicy:
+  enabled: true
+  ingressController:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: ingress-nginx
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/name: ingress-nginx
+
+storage:
+  dataSizeLimit: 1Gi
+  tmpSizeLimit: 64Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

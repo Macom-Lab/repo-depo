@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["image", "ingress", "externalSecret", "resources", "networkPolicy"],
+  "properties": {
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "image": {
+      "type": "object",
+      "required": ["repository", "tag", "pullPolicy"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "minLength": 1, "not": { "const": "latest" } },
+        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+      },
+      "additionalProperties": false
+    },
+    "ingress": {
+      "type": "object",
+      "required": ["enabled", "className", "host", "path", "pathType", "tls"],
+      "properties": {
+        "enabled": { "const": true },
+        "className": { "type": "string", "minLength": 1 },
+        "annotations": { "type": "object" },
+        "host": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^/" },
+        "pathType": { "enum": ["Exact", "Prefix"] },
+        "tls": {
+          "type": "object",
+          "required": ["enabled", "secretName"],
+          "properties": {
+            "enabled": { "const": true },
+            "secretName": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "externalSecret": {
+      "type": "object",
+      "required": ["refreshInterval", "secretStoreRef", "remoteRef"],
+      "properties": {
+        "refreshInterval": { "type": "string", "minLength": 1 },
+        "secretStoreRef": {
+          "type": "object",
+          "required": ["name", "kind"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "kind": { "enum": ["SecretStore", "ClusterSecretStore"] }
+          }
+        },
+        "remoteRef": {
+          "type": "object",
+          "required": ["key", "secretKeyProperty", "databaseUrlProperty", "notifyServiceKeyProperty"],
+          "properties": {
+            "key": { "type": "string", "minLength": 1 },
+            "secretKeyProperty": { "type": "string", "minLength": 1 },
+            "databaseUrlProperty": { "type": "string", "minLength": 1 },
+            "notifyServiceKeyProperty": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "required": ["notifyServiceUrl", "accessTokenExpireMinutes", "publicBaseUrl", "corsAllowedOrigins"],
+      "properties": {
+        "notifyServiceUrl": { "type": "string", "pattern": "^https?://" },
+        "accessTokenExpireMinutes": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+        "publicBaseUrl": { "type": "string", "pattern": "^https://" },
+        "corsAllowedOrigins": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "resources": {
+      "type": "object",
+      "required": ["requests", "limits"]
+    },
+    "networkPolicy": {
+      "type": "object",
+      "required": ["enabled", "ingressController"],
+      "properties": {
+        "enabled": { "const": true },
+        "ingressController": {
+          "type": "object",
+          "required": ["namespaceSelector", "podSelector"]
+        }
+      }
+    }
+  }
+}

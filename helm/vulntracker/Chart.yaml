@@ -1,0 +1,12 @@
+apiVersion: v2
+name: vulntracker
+description: Hardened Kubernetes deployment for the VulnTracker FastAPI service
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.25.0-0"
+annotations:
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial hardened deployment chart
+  artifacthub.io/prerelease: "false"
