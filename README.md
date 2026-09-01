@@ -215,3 +215,44 @@ We are not grading on volume. We are grading on judgment.
 - **Communication**: Would a non-technical executive understand your summary?
 
 Good luck. If anything in the brief is ambiguous, document your assumption and proceed.
+
+---
+
+## Trivy vulnerability scanning
+
+CI scans both the checked-out repository and the built API container. Each scan
+first produces a complete JSON report and uploads it as a workflow artifact for
+30 days. A second policy step fails the build when Trivy finds a fixable
+`HIGH` or `CRITICAL` vulnerability. Unfixed findings remain visible in the JSON
+report and are tracked in `docs/remediation-plan.md`, but do not make every
+build permanently red while no vendor patch exists.
+
+The Trivy action is pinned to the full commit SHA for release v0.36.0 instead
+of a mutable version tag, and the scanner itself is pinned to v0.74.0. The
+workflow has read-only repository permissions.
+
+Run the equivalent scans manually with the Trivy CLI:
+
+```bash
+# Repository dependencies and secrets
+trivy fs --scanners vuln,secret \
+  --skip-dirs .git,.venv,.pytest_cache,.cache,.trivy-temp,notify/node_modules,reports \
+  --format json --output reports/sca.trivy.json .
+
+# Build and scan the runtime image
+docker build --tag vulntracker:local .
+trivy image --scanners vuln,misconfig \
+  --format json --output reports/container.trivy.json vulntracker:local
+
+# Apply the same blocking policy as CI
+trivy fs --scanners vuln \
+  --skip-dirs .git,.venv,.pytest_cache,.cache,.trivy-temp,notify/node_modules,reports \
+  --severity HIGH,CRITICAL --ignore-unfixed \
+  --exit-code 1 .
+trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
+  --exit-code 1 vulntracker:local
+```
+
+The generated reports are `reports/sca.trivy.json` and
+`reports/container.trivy.json`. Trivy downloads its vulnerability database on
+the first run, so local execution requires network access.

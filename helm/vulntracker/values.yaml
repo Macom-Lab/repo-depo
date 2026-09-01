@@ -4,7 +4,7 @@ image:
   repository: vulntracker-api
   tag: "1.0.0"
   # Replace with the digest produced by your registry after pushing the image.
-  digest: "sha256:911727695825a54e25b8554339930d8766624731ea39fbb19695fced310090aa"
+  digest: "sha256:51e1dd06ba46631e4d3461ec04947769796221a57178d63e5444740d7646523d"
   pullPolicy: Always
 
 imagePullSecrets: []

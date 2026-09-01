@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["**"]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -43,23 +46,83 @@ jobs:
         run: npm test
         working-directory: notify
 
-  # TODO (candidates): Add the following security scanning jobs.
-  # Tool selection is your decision — document your choices in findings.md.
-  #
-  # sast:
-  #   Static Application Security Testing against app/ source code
-  #   Upload JSON report as a build artifact named sast.<tool>.json
-  #   Build should fail on critical findings
-  #
-  # sca:
-  #   Dependency / Software Composition Analysis against requirements.txt
-  #   Upload JSON report as a build artifact named sca.<tool>.json
-  #   Build should fail on critical or high severity CVEs
-  #
-  # container-scan:
-  #   Build the Docker image, then scan it for vulnerabilities and misconfigurations
-  #   Upload JSON report as a build artifact named container.<tool>.json
-  #
-  # iac-scan:
-  #   Scan the Helm chart or Terraform configuration for security misconfigurations
-  #   Upload JSON report as a build artifact named iac.<tool>.json
+  trivy-repository:
+    name: Trivy repository scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate repository vulnerability report
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          skip-dirs: .git,.venv,.pytest_cache,.cache,.trivy-temp,notify/node_modules,reports
+          format: json
+          output: reports/sca.trivy.json
+          exit-code: "0"
+          version: v0.74.0
+
+      - name: Upload repository vulnerability report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sca.trivy
+          path: reports/sca.trivy.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce repository vulnerability policy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          skip-dirs: .git,.venv,.pytest_cache,.cache,.trivy-temp,notify/node_modules,reports
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: "1"
+          skip-setup-trivy: true
+
+  trivy-container:
+    name: Trivy container scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build --tag vulntracker:${{ github.sha }} .
+
+      - name: Generate container vulnerability report
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: vulntracker:${{ github.sha }}
+          scanners: vuln,misconfig
+          format: json
+          output: reports/container.trivy.json
+          exit-code: "0"
+          version: v0.74.0
+
+      - name: Upload container vulnerability report
+        uses: actions/upload-artifact@v4
+        with:
+          name: container.trivy
+          path: reports/container.trivy.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce container vulnerability policy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: vulntracker:${{ github.sha }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: "1"
+          skip-setup-trivy: true

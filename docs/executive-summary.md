@@ -24,11 +24,13 @@ dependencies.
    reliable limit must live in shared gateway or datastore infrastructure, not
    in one application process.
 
-2. **The base operating system contains four serious Perl advisories with no
-   vendor fix.** The application does not use Perl, and the container runs
+2. **The base operating system still contains serious findings without vendor
+   fixes.** The current scan records 3 critical and 13 high package entries;
+   several refer to the same underlying issue across related packages. Most
+   affected features are not used by the application, and the container runs
    without root privileges or write access to its code, which lowers practical
-   exposure. The image must be rebuilt as soon as Debian publishes patched
-   packages; a smaller custom runtime is the fallback if fixes remain delayed.
+   exposure. The image must be rebuilt when Debian publishes fixes; a smaller
+   custom runtime is the fallback if fixes remain delayed.
 
 3. **The required shared-report password interface can leak credentials into
    browser history or upstream logs.** The report is limited to one record and
